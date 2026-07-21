@@ -6,7 +6,10 @@ every query in every router MUST filter by user_id explicitly. See auth.py
 for the get_current_user dependency that supplies it.
 """
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+
+def utcnow():
+    return datetime.now(timezone.utc)
 
 from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, ARRAY, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
@@ -25,7 +28,7 @@ class User(Base):
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
     email = Column(String, unique=True, nullable=False, index=True)
     hashed_password = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
 
     projects = relationship("Project", back_populates="owner", cascade="all, delete-orphan")
 
@@ -36,7 +39,7 @@ class Project(Base):
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
     user_id = Column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=False)
     name = Column(String, nullable=False)  # e.g. "Cryptocurrency Fraud Detection"
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
 
     owner = relationship("User", back_populates="projects")
     papers = relationship("Paper", back_populates="project", cascade="all, delete-orphan")
@@ -54,7 +57,7 @@ class Paper(Base):
     year = Column(Integer, nullable=True)
     filename = Column(String, nullable=True)
     content_hash = Column(String, nullable=True, index=True)  # SHA256 of file bytes, for duplicate detection
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
 
     __table_args__ = (
         # Same file can't be uploaded twice into the same project. Not global
@@ -94,7 +97,7 @@ class Note(Base):
     highlighted_text = Column(Text, nullable=False)
     note_text = Column(Text, nullable=True)
     location = Column(String, nullable=True)  # e.g. page/offset, for jump-back-to-highlight
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
 
     paper = relationship("Paper", back_populates="notes")
 

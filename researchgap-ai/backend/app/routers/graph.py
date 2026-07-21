@@ -1,60 +1,90 @@
-from fastapi import APIRouter, Depends
-from supabase import Client
+"""
+Builds node/edge data for the 3D corkboard graph, directly from the
+structured paper analysis and persisted research_gaps -- both are free
+byproducts of the extraction/gap-finder pipeline, not separately computed
+here. This is what the frontend's Graph3D component (react-force-graph-3d)
+renders as pinned cards with red string connections.
+
+Returns:
+  nodes: [{id, type: 'paper'|'gap', label}]
+  edges: [{source, target, relation: 'shares_dataset'|'shares_method'|'addresses_gap'}]
+"""
 from collections import defaultdict
 
-from app.core.auth import get_user_scoped_client
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from pydantic import BaseModel
+
+from app.core.database import get_db
+from app.core.auth import get_current_user
+from app.models import User, Project, Paper, ResearchGap
 
 router = APIRouter(prefix="/graph", tags=["graph"])
 
 
-@router.get("/{project_id}")
-async def get_graph(project_id: str, db: Client = Depends(get_user_scoped_client)):
-    """
-    Builds the node/edge data for the 3D graph directly from the structured
-    paper analysis (method/dataset/limitations per paper). This is why the
-    Research Gap Finder's structured extraction step matters -- the graph
-    is a free byproduct of that data, not separately computed.
+class GraphNode(BaseModel):
+    id: str
+    type: str  # "paper" | "gap"
+    label: str
 
-    Returns:
-      nodes: [{id, type: 'paper'|'gap', label, ...}]
-      edges: [{source, target, relation: 'shares_dataset'|'shares_method'|'addresses_gap'}]
-    """
-    papers = db.table("papers").select("id, title").eq("project_id", project_id).execute().data
-    analyses = db.table("paper_analysis").select("*").in_(
-        "paper_id", [p["id"] for p in papers]
-    ).execute().data if papers else []
 
-    analysis_by_paper = {a["paper_id"]: a for a in analyses}
+class GraphEdge(BaseModel):
+    source: str
+    target: str
+    relation: str  # "shares_dataset" | "shares_method" | "addresses_gap"
 
-    nodes = [
-        {"id": p["id"], "type": "paper", "label": p["title"]}
-        for p in papers
-    ]
+
+class GraphResponse(BaseModel):
+    nodes: list[GraphNode]
+    edges: list[GraphEdge]
+
+
+@router.get("/{project_id}", response_model=GraphResponse)
+def get_graph(
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = (
+        db.query(Project)
+        .filter(Project.id == project_id, Project.user_id == current_user.id)
+        .first()
+    )
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    papers = (
+        db.query(Paper)
+        .filter(Paper.project_id == project.id, Paper.user_id == current_user.id)
+        .all()
+    )
+
+    nodes = [GraphNode(id=p.id, type="paper", label=p.title) for p in papers]
 
     edges = []
     # group papers sharing a dataset or method -> creates the visible clusters
     by_dataset, by_method = defaultdict(list), defaultdict(list)
-    for pid, a in analysis_by_paper.items():
-        if a.get("dataset"):
-            by_dataset[a["dataset"]].append(pid)
-        if a.get("method"):
-            by_method[a["method"]].append(pid)
+    for p in papers:
+        if p.analysis is None:
+            continue
+        if p.analysis.dataset:
+            by_dataset[p.analysis.dataset].append(p.id)
+        if p.analysis.method:
+            by_method[p.analysis.method].append(p.id)
 
     def link_group(groups: dict, relation: str):
         for _, ids in groups.items():
             for i in range(len(ids)):
                 for j in range(i + 1, len(ids)):
-                    edges.append({"source": ids[i], "target": ids[j], "relation": relation})
+                    edges.append(GraphEdge(source=ids[i], target=ids[j], relation=relation))
 
     link_group(by_dataset, "shares_dataset")
     link_group(by_method, "shares_method")
 
-    # gap nodes are computed separately by the gap-finder service and stored;
-    # simplified here as a placeholder query
-    gaps = db.table("research_gaps").select("*").eq("project_id", project_id).execute().data
+    gaps = db.query(ResearchGap).filter(ResearchGap.project_id == project.id).all()
     for g in gaps:
-        nodes.append({"id": g["id"], "type": "gap", "label": g["title"]})
-        for pid in g.get("related_paper_ids", []):
-            edges.append({"source": pid, "target": g["id"], "relation": "addresses_gap"})
+        nodes.append(GraphNode(id=g.id, type="gap", label=g.title))
+        for paper_id in (g.related_paper_ids or []):
+            edges.append(GraphEdge(source=paper_id, target=g.id, relation="addresses_gap"))
 
-    return {"nodes": nodes, "edges": edges}
+    return GraphResponse(nodes=nodes, edges=edges)
