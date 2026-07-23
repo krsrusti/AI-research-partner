@@ -1,139 +1,147 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { api } from "../lib/api";
+import { isAuthenticated, logout } from "../lib/auth";
 
-// Cycling status label -- structurally inspired by instrument-style rotating
-// tags (workload/error/focus/intent-type displays), filled with our actual
-// pipeline stages instead of generic buzzwords.
-const PIPELINE_STAGES = ["EXTRACTING", "COMPARING", "SYNTHESIZING", "IDENTIFYING GAPS"];
+export default function Dashboard() {
+  const navigate = useNavigate();
+  const [projects, setProjects] = useState(null); // null = loading
+  const [error, setError] = useState(null);
+  const [newName, setNewName] = useState("");
+  const [creating, setCreating] = useState(false);
 
-function CyclingStage() {
-  const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    const id = setInterval(() => setIndex((i) => (i + 1) % PIPELINE_STAGES.length), 1800);
-    return () => clearInterval(id);
+  const loadProjects = useCallback(async () => {
+    try {
+      const data = await api.get("/projects");
+      setProjects(data);
+    } catch {
+      setError("Couldn't load your cases. Try refreshing.");
+    }
   }, []);
 
-  return (
-    <span className="font-mono text-xs tracking-[0.2em] text-evidence">
-      {PIPELINE_STAGES[index]}
-    </span>
-  );
-}
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      navigate("/login");
+      return;
+    }
+    loadProjects();
+  }, [navigate, loadProjects]);
 
-const EXHIBITS = [
-  {
-    label: "EXHIBIT A",
-    title: "Research Library",
-    body: "Upload a stack of papers. Organize them into cases by topic.",
-  },
-  {
-    label: "EXHIBIT B",
-    title: "Chat With the Papers",
-    body: "Ask what a method was, what dataset was used, what broke down. Answers are grounded in the actual text, with the source cited.",
-  },
-  {
-    label: "EXHIBIT C",
-    title: "Cross-Paper Search",
-    body: "Search by meaning, not keyword. \"Fraud detection on Ethereum\" finds GraphSAGE, GCN, and GAT papers alike.",
-  },
-  {
-    label: "EXHIBIT D",
-    title: "The Gap Report",
-    body: "Not what each paper says, but what the whole body of work is missing. Trends, shared limitations, and the specific questions no one's answered yet.",
-  },
-];
+  async function handleCreate(e) {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    setCreating(true);
+    setError(null);
+    try {
+      const project = await api.post("/projects", { name: newName.trim() });
+      setProjects((prev) => [project, ...(prev || [])]);
+      setNewName("");
+    } catch (err) {
+      setError(err.message || "Couldn't create the case.");
+    } finally {
+      setCreating(false);
+    }
+  }
 
-export default function Landing() {
+  async function handleDelete(id, e) {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!window.confirm("Delete this case? This can't be undone.")) return;
+    try {
+      await api.delete(`/projects/${id}`);
+      setProjects((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      setError(err.message || "Couldn't delete the case.");
+    }
+  }
+
+  function handleLogout() {
+    logout();
+    navigate("/login");
+  }
+
   return (
     <div className="min-h-screen bg-manila text-ink">
-      {/* Header */}
       <header className="border-b border-ink/15">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
-          <span className="font-mono text-sm font-medium tracking-[0.15em]">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-5">
+          <Link to="/" className="font-mono text-sm font-medium tracking-[0.15em]">
             RESEARCHGAP&nbsp;AI
-          </span>
-          <nav className="flex items-center gap-6 font-mono text-xs tracking-wide">
-            <Link to="/login" className="text-fog hover:text-ink transition-colors">
-              LOG IN
-            </Link>
-            <Link
-              to="/register"
-              className="border border-ink px-3 py-1.5 hover:bg-ink hover:text-manila transition-colors"
-            >
-              OPEN A CASE
-            </Link>
-          </nav>
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="font-mono text-xs tracking-wide text-fog hover:text-ink"
+          >
+            LOG OUT
+          </button>
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="mx-auto max-w-5xl px-6 pt-24 pb-20">
-        <div className="mb-6">
-          <CyclingStage />
-        </div>
-        <h1 className="font-display text-5xl leading-[1.08] tracking-tight sm:text-6xl">
-          Find what the research
-          <br />
-          hasn&apos;t answered yet.
-        </h1>
-        <p className="mt-6 max-w-xl font-body text-lg leading-relaxed text-fog">
-          Upload a stack of papers. We read every one of them, compare methods and
-          datasets across the whole set, and show you the gap &mdash; grounded in
-          citations, not guesses.
-        </p>
-        <div className="mt-10 flex items-center gap-4">
-          <Link
-            to="/register"
-            className="bg-evidence px-6 py-3 font-mono text-sm tracking-wide text-manila hover:bg-evidence/90 transition-colors"
+      <main className="mx-auto max-w-4xl px-6 py-12">
+        <p className="font-mono text-xs tracking-[0.2em] text-cork">YOUR CASES</p>
+        <h1 className="mt-2 font-display text-3xl">Open a case, or start a new one</h1>
+
+        <form onSubmit={handleCreate} className="mt-8 flex gap-3">
+          <input
+            type="text"
+            placeholder="e.g. Cryptocurrency Fraud Detection"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            className="flex-1 border border-ink/25 bg-manila px-3 py-2.5 font-body text-ink outline-none focus:border-steel"
+          />
+          <button
+            type="submit"
+            disabled={creating || !newName.trim()}
+            className="bg-evidence px-5 py-2.5 font-mono text-sm tracking-wide text-manila transition-colors hover:bg-evidence/90 disabled:opacity-50"
           >
-            START A CASE
-          </Link>
-          <span className="font-mono text-xs text-fog">No credit card. Free to start.</span>
-        </div>
-      </section>
+            {creating ? "OPENING..." : "+ NEW CASE"}
+          </button>
+        </form>
 
-      {/* Exhibits */}
-      <section className="border-t border-ink/15 bg-ink text-manila">
-        <div className="mx-auto max-w-5xl px-6 py-20">
-          <p className="mb-12 font-mono text-xs tracking-[0.2em] text-cork">
-            THE CASE FILE
+        {error && (
+          <p role="alert" className="mt-4 font-mono text-xs text-evidence">
+            {error}
           </p>
-          <div className="grid gap-px sm:grid-cols-2">
-            {EXHIBITS.map((ex) => (
-              <div key={ex.label} className="bg-ink p-8 sm:border sm:border-manila/10">
-                <p className="mb-3 font-mono text-xs tracking-[0.2em] text-evidence">
-                  {ex.label}
-                </p>
-                <h3 className="font-display text-2xl">{ex.title}</h3>
-                <p className="mt-3 font-body text-sm leading-relaxed text-manila/70">
-                  {ex.body}
-                </p>
-              </div>
-            ))}
-          </div>
+        )}
+
+        <div className="mt-10">
+          {projects === null && (
+            <p className="font-mono text-xs text-fog">LOADING...</p>
+          )}
+
+          {projects !== null && projects.length === 0 && (
+            <p className="font-body text-sm text-fog">
+              No cases yet. Open your first one above.
+            </p>
+          )}
+
+          {projects !== null && projects.length > 0 && (
+            <ul className="divide-y divide-ink/10 border border-ink/10">
+              {projects.map((project) => (
+                <li key={project.id}>
+                  <Link
+                    to={`/projects/${project.id}`}
+                    className="flex items-center justify-between px-5 py-4 hover:bg-ink/[0.03] transition-colors"
+                  >
+                    <div>
+                      <p className="font-display text-lg">{project.name}</p>
+                      <p className="mt-0.5 font-mono text-[11px] text-fog">
+                        OPENED {new Date(project.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => handleDelete(project.id, e)}
+                      className="font-mono text-xs text-fog hover:text-evidence"
+                      aria-label={`Delete ${project.name}`}
+                    >
+                      DELETE
+                    </button>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-      </section>
-
-      {/* Closing CTA */}
-      <section className="mx-auto max-w-5xl px-6 py-24 text-center">
-        <h2 className="font-display text-3xl">
-          Ten papers deep and still no clear answer?
-        </h2>
-        <p className="mt-4 font-body text-fog">
-          That&apos;s exactly the moment this is built for.
-        </p>
-        <Link
-          to="/register"
-          className="mt-8 inline-block border border-ink px-6 py-3 font-mono text-sm tracking-wide hover:bg-ink hover:text-manila transition-colors"
-        >
-          OPEN A CASE
-        </Link>
-      </section>
-
-      <footer className="border-t border-ink/15 py-8 text-center font-mono text-xs text-fog">
-        RESEARCHGAP AI &mdash; a research gap finder
-      </footer>
+      </main>
     </div>
   );
 }

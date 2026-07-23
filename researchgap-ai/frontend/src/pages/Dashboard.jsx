@@ -1,139 +1,128 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { api } from "../lib/api";
+import { isAuthenticated, logout } from "../lib/auth";
 
-// Cycling status label -- structurally inspired by instrument-style rotating
-// tags (workload/error/focus/intent-type displays), filled with our actual
-// pipeline stages instead of generic buzzwords.
-const PIPELINE_STAGES = ["EXTRACTING", "COMPARING", "SYNTHESIZING", "IDENTIFYING GAPS"];
+const RECENT_CASES_LIMIT = 5;
 
-function CyclingStage() {
-  const [index, setIndex] = useState(0);
+export default function Dashboard() {
+  const navigate = useNavigate();
+  const [projects, setProjects] = useState(null); // null = loading
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const id = setInterval(() => setIndex((i) => (i + 1) % PIPELINE_STAGES.length), 1800);
-    return () => clearInterval(id);
+  const loadProjects = useCallback(async () => {
+    try {
+      const data = await api.get("/projects");
+      setProjects(data);
+    } catch {
+      setError("Couldn't load your cases.");
+    }
   }, []);
 
-  return (
-    <span className="font-mono text-xs tracking-[0.2em] text-evidence">
-      {PIPELINE_STAGES[index]}
-    </span>
-  );
-}
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      navigate("/login");
+      return;
+    }
+    loadProjects();
+  }, [navigate, loadProjects]);
 
-const EXHIBITS = [
-  {
-    label: "EXHIBIT A",
-    title: "Research Library",
-    body: "Upload a stack of papers. Organize them into cases by topic.",
-  },
-  {
-    label: "EXHIBIT B",
-    title: "Chat With the Papers",
-    body: "Ask what a method was, what dataset was used, what broke down. Answers are grounded in the actual text, with the source cited.",
-  },
-  {
-    label: "EXHIBIT C",
-    title: "Cross-Paper Search",
-    body: "Search by meaning, not keyword. \"Fraud detection on Ethereum\" finds GraphSAGE, GCN, and GAT papers alike.",
-  },
-  {
-    label: "EXHIBIT D",
-    title: "The Gap Report",
-    body: "Not what each paper says, but what the whole body of work is missing. Trends, shared limitations, and the specific questions no one's answered yet.",
-  },
-];
+  function handleLogout() {
+    logout();
+    navigate("/login");
+  }
 
-export default function Landing() {
+  const recentCases = projects ? projects.slice(0, RECENT_CASES_LIMIT) : [];
+
   return (
     <div className="min-h-screen bg-manila text-ink">
-      {/* Header */}
       <header className="border-b border-ink/15">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
-          <span className="font-mono text-sm font-medium tracking-[0.15em]">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-5">
+          <Link to="/" className="font-mono text-sm font-medium tracking-[0.15em]">
             RESEARCHGAP&nbsp;AI
-          </span>
-          <nav className="flex items-center gap-6 font-mono text-xs tracking-wide">
-            <Link to="/login" className="text-fog hover:text-ink transition-colors">
-              LOG IN
-            </Link>
-            <Link
-              to="/register"
-              className="border border-ink px-3 py-1.5 hover:bg-ink hover:text-manila transition-colors"
-            >
-              SIGN UP
-            </Link>
-          </nav>
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="font-mono text-xs tracking-wide text-fog hover:text-ink"
+          >
+            LOG OUT
+          </button>
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="mx-auto max-w-5xl px-6 pt-24 pb-20">
-        <div className="mb-6">
-          <CyclingStage />
-        </div>
-        <h1 className="font-display text-5xl leading-[1.08] tracking-tight sm:text-6xl">
-          Find what the research
-          <br />
-          hasn&apos;t answered yet.
-        </h1>
-        <p className="mt-6 max-w-xl font-body text-lg leading-relaxed text-fog">
-          Upload a stack of papers. We read every one of them, compare methods and
-          datasets across the whole set, and show you the gap &mdash; grounded in
-          citations, not guesses.
-        </p>
-        <div className="mt-10 flex items-center gap-4">
-          <Link
-            to="/register"
-            className="bg-evidence px-6 py-3 font-mono text-sm tracking-wide text-manila hover:bg-evidence/90 transition-colors"
-          >
-            START A CASE
-          </Link>
-          <span className="font-mono text-xs text-fog">No credit card. Free to start.</span>
-        </div>
-      </section>
+      <main className="mx-auto max-w-4xl px-6 py-12">
+        <p className="font-mono text-xs tracking-[0.2em] text-cork">DASHBOARD</p>
+        <h1 className="mt-2 font-display text-3xl">Welcome back.</h1>
 
-      {/* Exhibits */}
-      <section className="border-t border-ink/15 bg-ink text-manila">
-        <div className="mx-auto max-w-5xl px-6 py-20">
-          <p className="mb-12 font-mono text-xs tracking-[0.2em] text-cork">
-            THE CASE FILE
+        {error && (
+          <p role="alert" className="mt-4 font-mono text-xs text-evidence">
+            {error}
           </p>
-          <div className="grid gap-px sm:grid-cols-2">
-            {EXHIBITS.map((ex) => (
-              <div key={ex.label} className="bg-ink p-8 sm:border sm:border-manila/10">
-                <p className="mb-3 font-mono text-xs tracking-[0.2em] text-evidence">
-                  {ex.label}
-                </p>
-                <h3 className="font-display text-2xl">{ex.title}</h3>
-                <p className="mt-3 font-body text-sm leading-relaxed text-manila/70">
-                  {ex.body}
-                </p>
-              </div>
-            ))}
+        )}
+
+        {/* Stats */}
+        <div className="mt-10 grid grid-cols-2 gap-px border border-ink/10 sm:grid-cols-3">
+          <div className="bg-manila p-6">
+            <p className="font-mono text-[11px] tracking-wide text-fog">OPEN CASES</p>
+            <p className="mt-2 font-display text-4xl">
+              {projects === null ? "\u2014" : projects.length}
+            </p>
+          </div>
+          <div className="border-l border-ink/10 bg-manila p-6 sm:border-l-0 sm:border-x">
+            <p className="font-mono text-[11px] tracking-wide text-fog">MOST RECENT</p>
+            <p className="mt-2 font-display text-lg leading-tight">
+              {projects === null
+                ? "\u2014"
+                : projects.length > 0
+                ? projects[0].name
+                : "No cases yet"}
+            </p>
           </div>
         </div>
-      </section>
 
-      {/* Closing CTA */}
-      <section className="mx-auto max-w-5xl px-6 py-24 text-center">
-        <h2 className="font-display text-3xl">
-          Ten papers deep and still no clear answer?
-        </h2>
-        <p className="mt-4 font-body text-fog">
-          That&apos;s exactly the moment this is built for.
-        </p>
-        <Link
-          to="/register"
-          className="mt-8 inline-block border border-ink px-6 py-3 font-mono text-sm tracking-wide hover:bg-ink hover:text-manila transition-colors"
-        >
-          REGISTER
-        </Link>
-      </section>
+        {/* Recent cases */}
+        <div className="mt-10 flex items-center justify-between">
+          <p className="font-mono text-xs tracking-[0.2em] text-cork">RECENT CASES</p>
+          <Link to="/projects" className="font-mono text-xs text-steel hover:underline">
+            VIEW ALL &rarr;
+          </Link>
+        </div>
 
-      <footer className="border-t border-ink/15 py-8 text-center font-mono text-xs text-fog">
-        RESEARCHGAP AI &mdash; a research gap finder
-      </footer>
+        <div className="mt-4">
+          {projects !== null && projects.length === 0 && (
+            <div className="border border-ink/10 p-6 text-center">
+              <p className="font-body text-sm text-fog">No cases yet.</p>
+              <Link
+                to="/projects"
+                className="mt-3 inline-block bg-evidence px-4 py-2 font-mono text-xs tracking-wide text-manila hover:bg-evidence/90"
+              >
+                + OPEN YOUR FIRST CASE
+              </Link>
+            </div>
+          )}
+
+          {recentCases.length > 0 && (
+            <ul className="divide-y divide-ink/10 border border-ink/10">
+              {recentCases.map((project) => (
+                <li key={project.id}>
+                  <Link
+                    to={`/projects/${project.id}`}
+                    className="flex items-center justify-between px-5 py-4 hover:bg-ink/[0.03] transition-colors"
+                  >
+                    <div>
+                      <p className="font-display text-lg">{project.name}</p>
+                      <p className="mt-0.5 font-mono text-[11px] text-fog">
+                        OPENED {new Date(project.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span className="font-mono text-xs text-fog">OPEN &rarr;</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
