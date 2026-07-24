@@ -5,9 +5,7 @@ frontend dev server.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import auth, projects, papers, search, gaps, graph, notes
-
-# TODO: from app.routers import chat
+from app.routers import auth, projects, papers, search, gaps, graph, notes, chat
 
 app = FastAPI(title="ResearchGap AI")
 
@@ -26,8 +24,7 @@ app.include_router(search.router)
 app.include_router(gaps.router)
 app.include_router(graph.router)
 app.include_router(notes.router)
-
-# TODO: app.include_router(chat.router)
+app.include_router(chat.router)
 
 
 @app.get("/health")

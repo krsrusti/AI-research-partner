@@ -47,6 +47,7 @@ def search(
     hits = semantic_search(
         query=payload.query,
         user_id=current_user.id,
+        project_id=payload.project_id,
         n_results=payload.n_results,
     )
     return hits

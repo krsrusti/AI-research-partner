@@ -119,7 +119,7 @@ async def upload_paper(
         raise HTTPException(status_code=409, detail="This exact file was already uploaded to this project")
     db.refresh(paper)
 
-    embed_and_store(chunks, paper_id=paper.id, user_id=current_user.id)
+    embed_and_store(chunks, paper_id=paper.id, project_id=paper.project_id, user_id=current_user.id)
 
     structured = extract_structured_fields(chunks)
     llm_title = structured.pop("title", None)  # not a paper_analysis column -- belongs on Paper
