@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { register } from "../lib/auth";
 import { ApiError } from "../lib/api";
+import Spinner from "../components/Spinner";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -87,9 +88,16 @@ export default function Register() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-evidence px-4 py-3 font-mono text-sm tracking-wide text-manila transition-colors hover:bg-evidence/90 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 bg-evidence px-4 py-3 font-mono text-sm tracking-wide text-manila transition-colors hover:bg-evidence/90 disabled:opacity-50"
           >
-            {submitting ? "OPENING..." : "OPEN CASE FILE"}
+            {submitting ? (
+              <>
+                <Spinner size="sm" />
+                OPENING...
+              </>
+            ) : (
+              "OPEN CASE FILE"
+            )}
           </button>
         </form>
 

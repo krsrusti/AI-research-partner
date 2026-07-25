@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { api } from "../../lib/api";
 import { useProjectContext } from "../ProjectWorkspace";
+import Spinner from "../../components/Spinner";
 
 export default function PapersSection() {
   const { projectId, papers, refreshPapers } = useProjectContext();
@@ -42,8 +43,15 @@ export default function PapersSection() {
     <section>
       <div className="flex items-center justify-between">
         <p className="font-mono text-xs tracking-[0.2em] text-cork">EVIDENCE</p>
-        <label className="cursor-pointer bg-evidence px-4 py-2 font-mono text-xs tracking-wide text-manila transition-colors hover:bg-evidence/90">
-          {uploading ? "UPLOADING..." : "+ UPLOAD PAPER"}
+        <label className="flex cursor-pointer items-center gap-2 bg-evidence px-4 py-2 font-mono text-xs tracking-wide text-manila transition-colors hover:bg-evidence/90">
+          {uploading ? (
+            <>
+              <Spinner size="sm" />
+              UPLOADING...
+            </>
+          ) : (
+            "+ UPLOAD PAPER"
+          )}
           <input
             ref={fileInputRef}
             type="file"

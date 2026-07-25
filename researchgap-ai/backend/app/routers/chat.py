@@ -1,9 +1,9 @@
 """
 RAG chat (Feature 2 in the project spec): ask a question, get an answer
 grounded in the actual paper text via semantic search, with sources cited.
-Deliberately instructs the LLM to answer ONLY from the retrieved chunks,
-to reduce hallucination -- if nothing relevant is retrieved, it says so
-rather than guessing from general knowledge.
+Answer comes back as bullet points (not a single paragraph) -- easier to
+scan, and forces the LLM toward discrete grounded claims rather than a
+flowing narrative that's harder to verify against the sources.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -13,20 +13,21 @@ from app.core.database import get_db
 from app.core.auth import get_current_user
 from app.models import User, Project, Paper
 from app.services.embeddings import semantic_search
-from app.services import llm
+from app.services.llm import generate_answer_points
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 CHAT_PROMPT_TEMPLATE = """You are answering a question about a collection of research papers, using ONLY \
-the excerpts below. If the excerpts don't contain enough information to answer, say so plainly -- \
-do not use outside knowledge or guess.
+the excerpts below. If the excerpts don't contain enough information to answer, say so plainly in a \
+single point -- do not use outside knowledge or guess.
+
+Respond as a JSON object: {{"answer_points": ["point 1", "point 2", ...]}}
+Each point should be one concise, self-contained claim grounded in the excerpts. Use 2-5 points.
 
 EXCERPTS:
 {excerpts}
 
 QUESTION: {question}
-
-Answer concisely, grounded only in the excerpts above.
 """
 
 N_CHUNKS_FOR_CONTEXT = 5
@@ -44,7 +45,7 @@ class ChatSource(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    answer: str
+    answer_points: list[str]
     sources: list[ChatSource]
 
 
@@ -74,15 +75,12 @@ def chat(
 
     if not hits:
         return ChatResponse(
-            answer="I couldn't find anything relevant in this project's papers to answer that.",
+            answer_points=["Nothing relevant was found in this project's papers to answer that."],
             sources=[],
         )
 
-    # Look up paper titles for the sources (semantic_search only returns paper_id)
     paper_ids = list({h["paper_id"] for h in hits})
-    papers_by_id = {
-        p.id: p for p in db.query(Paper).filter(Paper.id.in_(paper_ids)).all()
-    }
+    papers_by_id = {p.id: p for p in db.query(Paper).filter(Paper.id.in_(paper_ids)).all()}
 
     excerpts_text = "\n\n".join(
         f"[Source {i+1}, from \"{papers_by_id[h['paper_id']].title if h['paper_id'] in papers_by_id else 'Unknown'}\"]\n{h['text']}"
@@ -90,7 +88,7 @@ def chat(
     )
     prompt = CHAT_PROMPT_TEMPLATE.format(excerpts=excerpts_text, question=payload.question)
 
-    answer = llm.generate_text(prompt)
+    answer_points = generate_answer_points(prompt)
 
     sources = [
         ChatSource(
@@ -101,4 +99,4 @@ def chat(
         for h in hits
     ]
 
-    return ChatResponse(answer=answer, sources=sources)
+    return ChatResponse(answer_points=answer_points, sources=sources)

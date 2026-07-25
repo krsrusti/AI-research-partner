@@ -1,6 +1,6 @@
-// TODO: GapReport component
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../lib/api";
+import Spinner from "./Spinner";
 
 const MIN_PAPERS_FOR_REPORT = 2;
 
@@ -52,11 +52,26 @@ export default function GapReport({ projectId, paperCount }) {
         <button
           onClick={handleGenerate}
           disabled={!canGenerate || generating}
-          className="bg-evidence px-4 py-2 font-mono text-xs tracking-wide text-manila transition-colors hover:bg-evidence/90 disabled:opacity-50"
+          className="flex items-center gap-2 bg-evidence px-4 py-2 font-mono text-xs tracking-wide text-manila transition-colors hover:bg-evidence/90 disabled:opacity-50"
         >
-          {generating ? "ANALYZING..." : report ? "REGENERATE" : "GENERATE REPORT"}
+          {generating ? (
+            <>
+              <Spinner size="sm" />
+              ANALYZING...
+            </>
+          ) : report ? (
+            "REGENERATE"
+          ) : (
+            "GENERATE REPORT"
+          )}
         </button>
       </div>
+
+      {loadingExisting && (
+        <div className="mt-4">
+          <Spinner label="Checking for an existing report..." />
+        </div>
+      )}
 
       {!canGenerate && (
         <p className="mt-4 font-body text-sm text-fog">

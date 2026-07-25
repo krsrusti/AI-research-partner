@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { isAuthenticated, logout } from "../lib/auth";
+import Spinner from "../components/Spinner";
 
 const RECENT_CASES_LIMIT = 5;
 
@@ -65,17 +66,19 @@ export default function Dashboard() {
           <div className="bg-manila p-6">
             <p className="font-mono text-[11px] tracking-wide text-fog">OPEN CASES</p>
             <p className="mt-2 font-display text-4xl">
-              {projects === null ? "\u2014" : projects.length}
+              {projects === null ? <Spinner size="sm" /> : projects.length}
             </p>
           </div>
           <div className="border-l border-ink/10 bg-manila p-6 sm:border-l-0 sm:border-x">
             <p className="font-mono text-[11px] tracking-wide text-fog">MOST RECENT</p>
             <p className="mt-2 font-display text-lg leading-tight">
-              {projects === null
-                ? "\u2014"
-                : projects.length > 0
-                ? projects[0].name
-                : "No cases yet"}
+              {projects === null ? (
+                <Spinner size="sm" />
+              ) : projects.length > 0 ? (
+                projects[0].name
+              ) : (
+                "No cases yet"
+              )}
             </p>
           </div>
         </div>

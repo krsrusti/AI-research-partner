@@ -8,8 +8,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    gemini_api_key: str = "unset"  # not required yet -- Pass 3 (Gemini extraction) will need a real key
     chroma_persist_dir: str = "./chroma_data"
+    paper_storage_dir: str = "./paper_files"  # raw uploaded PDFs, for the split-screen reader
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

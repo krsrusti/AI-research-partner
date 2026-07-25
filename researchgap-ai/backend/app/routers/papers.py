@@ -7,6 +7,7 @@ import hashlib
 from datetime import datetime
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
@@ -17,6 +18,7 @@ from app.models import User, Project, Paper, PaperAnalysis
 from app.services.pdf_processing import extract_and_chunk
 from app.services.embeddings import embed_and_store, delete_paper_vectors
 from app.services.extraction import extract_structured_fields
+from app.services.file_storage import save_paper_file, get_paper_file_path, delete_paper_file
 
 router = APIRouter(prefix="/papers", tags=["papers"])
 
@@ -119,6 +121,8 @@ async def upload_paper(
         raise HTTPException(status_code=409, detail="This exact file was already uploaded to this project")
     db.refresh(paper)
 
+    save_paper_file(paper.id, raw_bytes)
+
     embed_and_store(chunks, paper_id=paper.id, project_id=paper.project_id, user_id=current_user.id)
 
     structured = extract_structured_fields(chunks)
@@ -151,6 +155,32 @@ def get_paper_analysis(
         raise HTTPException(status_code=404, detail="Paper or analysis not found")
 
     return paper.analysis
+
+
+@router.get("/{paper_id}/file")
+def get_paper_file(
+    paper_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Serves the original uploaded PDF, for the split-screen reader view.
+    Requires an authenticated request (Authorization header), same as
+    every other endpoint -- the frontend fetches this as a blob rather
+    than pointing an <iframe src> directly at it, since iframes can't
+    attach auth headers."""
+    paper = (
+        db.query(Paper)
+        .filter(Paper.id == paper_id, Paper.user_id == current_user.id)
+        .first()
+    )
+    if not paper:
+        raise HTTPException(status_code=404, detail="Paper not found")
+
+    file_path = get_paper_file_path(paper_id)
+    if not file_path:
+        raise HTTPException(status_code=404, detail="Original file not found (may predate file storage)")
+
+    return FileResponse(file_path, media_type="application/pdf", filename=paper.filename or "paper.pdf")
 
 
 @router.get("/{project_id}", response_model=list[PaperOut])
@@ -194,4 +224,5 @@ def delete_paper(
     db.delete(paper)
     db.commit()
     delete_paper_vectors(paper_id=paper_id, user_id=current_user.id)
+    delete_paper_file(paper_id)
     return {"deleted": paper_id}

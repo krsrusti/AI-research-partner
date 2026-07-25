@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { isAuthenticated, logout } from "../lib/auth";
+import Spinner from "../components/Spinner";
 
 export default function Projects() {
   const navigate = useNavigate();
@@ -105,7 +106,7 @@ export default function Projects() {
 
         <div className="mt-10">
           {projects === null && (
-            <p className="font-mono text-xs text-fog">LOADING...</p>
+            <Spinner label="Loading your cases..." />
           )}
 
           {projects !== null && projects.length === 0 && (

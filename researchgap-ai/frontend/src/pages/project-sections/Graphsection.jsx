@@ -1,4 +1,4 @@
-import Graph3D from "../../components/Graph3D";
+import Graph2D from "../../components/Graph2D";
 import { useProjectContext } from "../ProjectWorkspace";
 
 export default function GraphSection() {
@@ -7,9 +7,10 @@ export default function GraphSection() {
   return (
     <div>
       <p className="mb-4 font-body text-sm text-fog">
-        Every paper and gap, pinned and connected.
+        Papers and gaps, connected by shared method, dataset, or the gaps they address.
+        Click a node for details.
       </p>
-      <Graph3D projectId={projectId} />
+      <Graph2D projectId={projectId} />
     </div>
   );
 }

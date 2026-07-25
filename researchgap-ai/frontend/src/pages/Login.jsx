@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { login } from "../lib/auth";
 import { ApiError } from "../lib/api";
+import Spinner from "../components/Spinner";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -76,9 +77,16 @@ export default function Login() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-evidence px-4 py-3 font-mono text-sm tracking-wide text-manila transition-colors hover:bg-evidence/90 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 bg-evidence px-4 py-3 font-mono text-sm tracking-wide text-manila transition-colors hover:bg-evidence/90 disabled:opacity-50"
           >
-            {submitting ? "LOGGING IN..." : "LOG IN"}
+            {submitting ? (
+              <>
+                <Spinner size="sm" />
+                LOGGING IN...
+              </>
+            ) : (
+              "LOG IN"
+            )}
           </button>
         </form>
 

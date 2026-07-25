@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Link, NavLink, Outlet, useParams, useNavigate, useOutletContext } from "react-router-dom";
 import { api } from "../lib/api";
 import { isAuthenticated } from "../lib/auth";
+import Spinner from "../components/Spinner";
 
 const NAV_ITEMS = [
   { to: "papers", label: "PAPERS" },
@@ -77,7 +78,9 @@ export default function ProjectWorkspace() {
       )}
 
       {project === null && !error && (
-        <p className="mx-auto max-w-6xl px-6 pt-8 font-mono text-xs text-fog">LOADING...</p>
+        <div className="mx-auto max-w-6xl px-6 pt-8">
+          <Spinner label="Loading case..." />
+        </div>
       )}
 
       {project && (

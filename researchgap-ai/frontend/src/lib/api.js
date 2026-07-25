@@ -70,10 +70,37 @@ export async function apiUpload(path, formData) {
   return parseResponse(response);
 }
 
+/**
+ * Binary file requests (e.g. GET /papers/{id}/file). Iframes/embeds can't
+ * attach an Authorization header themselves, so this fetches the PDF as a
+ * blob first, then callers create an object URL from it to feed the
+ * <iframe src>.
+ */
+export async function apiGetBlob(path) {
+  const token = getToken();
+  const response = await fetch(`${BASE_URL}${path}`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) {
+    let detail = `Request failed with status ${response.status}`;
+    try {
+      const body = await response.json();
+      detail = body?.detail || detail;
+    } catch {
+      // response wasn't JSON (likely was actually the file, or a plain error) -- keep the generic message
+    }
+    throw new ApiError(detail, response.status);
+  }
+  return response.blob();
+}
+
 export const api = {
   get: (path) => apiFetch(path),
   post: (path, body) => apiFetch(path, { method: "POST", body: JSON.stringify(body) }),
   put: (path, body) => apiFetch(path, { method: "PUT", body: JSON.stringify(body) }),
   delete: (path) => apiFetch(path, { method: "DELETE" }),
   upload: apiUpload,
+  getBlob: apiGetBlob,
 };
