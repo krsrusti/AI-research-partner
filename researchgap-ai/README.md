@@ -23,15 +23,10 @@ npm install
 npm run dev
 ```
 
-## Status
 
-Files marked TODO are stubs — see the file structure walkthrough for what's built vs. planned.
-Currently implemented: PDF processing service, papers/graph routers (need updating from
-Supabase to SQLAlemy), Docker Compose + Dockerfile, full frontend scaffold with
-react-three-fiber / react-force-graph-3d wired in.
 
-Not yet implemented: models.py, database.py, security.py, auth.py, and the auth/projects/chat/
-notes/gaps routers (currently empty stubs).
+
+
 
 http://127.0.0.1:8000/docs
 python -m uvicorn app.main:app --reload
